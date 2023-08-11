@@ -69,5 +69,6 @@ done <<< "$matching_crates"
 
 echo $vulnerable_crate_files | tr '&' '\n' | tr ' ' '\n'
 # find crate methods used in cargo project
+# for now it will only print all vulnerable files
 
 
