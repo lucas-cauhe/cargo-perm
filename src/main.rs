@@ -30,21 +30,46 @@
 
 use std::path::Path;
 use log::{error, info}; 
+use std::io::Write;
 
 fn vanalyze(path: &Path, username: &str) -> Vaoutput {}
-fn integrate(va_input: &Vaoutput, file_no: usize, method_no: usize, payload: &dyn Payload) -> String {}
+
+// Returns a rust program to be compiled afterwards
+// Injects a payload into the <method_no>'th method in the <file_no>'th file specified in
+// <va_input>
+fn integrate(va_input: &Vaoutput, file_no: usize, method_no: usize, payload: &dyn Payload) -> PayloadResult<String> {
+
+   let file_selected = va_input.nth_file(file_no)?;
+   let method_starting_line = file_selected.nth_method_sl(method_no)?;
+   payload.inject(
+       &std::fs::read_to_string(file_selected.name).unwrap() 
+       , method_starting_line
+   )
+}
 // returns error if compilation was not successful
-fn ok_command(compiled: CompilationResult) -> Result<(), String> {}
+fn ok_command(file: &Path, comp_stat: CompilationStatus) -> Result<(), String> {
+    match comp_stat {
+        CompilationStatus::Correct(prog) /* Merge file */ => {
+            std::fs::OpenOptions::new()
+                .truncate(true)
+                .open(file)
+                .unwrap()
+                .write(prog.as_bytes())
+                .unwrap();
+            Ok(())
+        },
+        CompilationStatus::Flaw(e) => Err(format!("Error while compiling: {e}"))
+    }
+}
+
 
 // ghost function
 // takes a string, creates a rust program with it and compiles it returning its result
-fn compile_mock_integration(src_program: String) -> CompilationResult {}
+fn compile_mock_integration(src_program: String) -> CompilationStatus {}
 
-
-struct CompilationResult {
-    error_message: String,
-    compilation: String, // result program from compilation
-    status: i8
+enum CompilationStatus {
+    Correct(String), // contains the resulting program that compiled
+    Flaw(String) // contains the error message
 }
 
 // payload result wrapper
@@ -55,7 +80,7 @@ type PayloadResult<R> = Result<R, String>;
 pub trait Payload {
     // takes a bunch of string lines and a line number and injects the payload implementing it
     // into the string starting from <line_no>
-    fn inject(&self, src: &str, line_no: usize) -> PayloadResult<String>;
+    fn inject(&self, src: &str, line_no: &usize) -> PayloadResult<String>;
 }
 
 pub fn payload_from_str(src: &str) -> &dyn Payload {}
@@ -71,10 +96,26 @@ struct FileOutput {
     name: String,
     methods: Vec<FileMethod>
 }
+impl FileOutput {
+    pub fn nth_method_sl(&self, method_no: usize) -> Result<&usize, String> {
+       match self.methods.get(method_no) {
+           Some(f_method) => Ok(&f_method.line_no),
+           None => Err("Bad method number".to_string())
+       }
+    }
+}
 
 
 struct Vaoutput {
    files: Vec<FileOutput>
+}
+impl Vaoutput {
+    pub fn nth_file(&self, file_no: usize) -> Result<&FileOutput, String> {
+        match self.files.get(file_no) {
+            Some(f_out) => Ok(f_out),
+            None => Err("Bad file number".to_string())
+        }
+    }
 }
 
 fn main() {
