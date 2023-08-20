@@ -93,9 +93,9 @@ impl FromStr for BigInt {
 }
 ```
 
-And rerun it:
+And rerun it cleaning the target directory:
 ```
-cargo run
+cargo clean && cargo run
 Make a guess:
 20
 Message from beyond
@@ -131,4 +131,5 @@ All payload types (reverse shell mainly and other malware) that can be placed in
 
 ## Integration
 
-Takes one of the payloads listed above and a selected method to exploit from the vulnerability analyzer and integrates (copy and paste) the payload into the source code.
+Mock shell that receives commands to run the vulnerability analyzer and
+take one of the payloads listed above and a selected method to exploit from the vulnerability analyzer and integrates (copy and paste) the payload into the source code.
