@@ -47,9 +47,9 @@ fn integrate(va_input: &Vaoutput, file_no: usize, method_no: usize, payload: &dy
    )
 }
 // returns error if compilation was not successful
-fn ok_command(file: &Path, comp_stat: CompilationStatus) -> Result<(), String> {
+fn ok_command(comp_stat: CompilationStatus) -> Result<(), String> {
     match comp_stat {
-        CompilationStatus::Correct(prog) /* Merge file */ => {
+        CompilationStatus::Correct(prog, file) /* Merge file */ => {
             std::fs::OpenOptions::new()
                 .truncate(true)
                 .open(file)
@@ -68,7 +68,7 @@ fn ok_command(file: &Path, comp_stat: CompilationStatus) -> Result<(), String> {
 fn compile_mock_integration(src_program: String) -> CompilationStatus {}
 
 enum CompilationStatus {
-    Correct(String), // contains the resulting program that compiled
+    Correct(String, String), // contains the resulting program that compiled and the target_file
     Flaw(String) // contains the error message
 }
 
@@ -132,7 +132,7 @@ fn main() {
         }
     });
     let mut va_output: Option<Vaoutput> = None;
-    let mut comp_res: Option<CompilationResult> = None;
+    let mut comp_res: Option<CompilationStatus> = None;
     loop {
        match rx.try_recv().ok() {
            Some(cmd) => {
@@ -150,7 +150,7 @@ fn main() {
                                                 ,cmd_parts[1].parse::<usize>().unwrap()
                                                 , cmd_parts[2].parse::<usize>().unwrap()
                                                 , payload_from_str(cmd_parts[3])
-                           );
+                           ).unwrap();
                            comp_res = Some(
                                compile_mock_integration(integrated_payload)
                             );
@@ -160,7 +160,6 @@ fn main() {
                    },
                    "ok" => {
                        if let Some(compiled) = comp_res {
-
                            ok_command(compiled);
                            info!("Payload has been successfully injected");
                        } else {
