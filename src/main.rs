@@ -37,9 +37,8 @@ fn vanalyze(path: &Path, username: &str) -> Vaoutput {}
 // Returns a rust program to be compiled afterwards
 // Injects a payload into the <method_no>'th method in the <file_no>'th file specified in
 // <va_input>
-fn integrate(va_input: &Vaoutput, file_no: usize, method_no: usize, payload: &dyn Payload) -> PayloadResult<String> {
+fn integrate(va_input: &Vaoutput, file_selected: &FileOutput, method_no: usize, payload: &dyn Payload) -> PayloadResult<String> {
 
-   let file_selected = va_input.nth_file(file_no)?;
    let method_starting_line = file_selected.nth_method_sl(method_no)?;
    payload.inject(
        &std::fs::read_to_string(file_selected.name).unwrap() 
@@ -65,7 +64,25 @@ fn ok_command(comp_stat: CompilationStatus) -> Result<(), String> {
 
 // ghost function
 // takes a string, creates a rust program with it and compiles it returning its result
-fn compile_mock_integration(src_program: String) -> CompilationStatus {}
+fn compile_mock_integration(src_program: &str, target_crate: &str, target_file: &str) -> CompilationStatus {
+  //create file with <src_program>'s content 
+  let new_file_path = "/tmp/mock_program.rs".to_string();
+  std::fs::File::create(new_file_path).unwrap().write(src_program.as_bytes());
+  // run shell script
+  let output = std::process::Command::new("/bin/bash")
+      .args(["shell-scripts/compile_mock_integration.sh", target_crate, target_file, &new_file_path])
+      .stdout(std::process::Stdio::piped())
+      .stderr(std::process::Stdio::piped())
+      .output()
+      .unwrap();
+  // convert output to CompilationStatus
+  if output.stdout.len() > 0 {
+      CompilationStatus::Correct(src_program.to_string(), target_file.to_string())
+  }
+  else {
+      CompilationStatus::Flaw(String::from_utf8(output.stderr).unwrap())
+  }
+}
 
 enum CompilationStatus {
     Correct(String, String), // contains the resulting program that compiled and the target_file
@@ -107,12 +124,18 @@ impl FileOutput {
 
 
 struct Vaoutput {
-   files: Vec<FileOutput>
+   files: Vec<(String, FileOutput)> // crate name + file output
 }
 impl Vaoutput {
     pub fn nth_file(&self, file_no: usize) -> Result<&FileOutput, String> {
         match self.files.get(file_no) {
-            Some(f_out) => Ok(f_out),
+            Some((_, f_out)) => Ok(f_out),
+            None => Err("Bad file number".to_string())
+        }
+    }
+    pub fn nth_file_crate(&self, file_no: usize) -> Result<&String, String> {
+        match self.files.get(file_no) {
+            Some((crate_name, _)) => Ok(crate_name),
             None => Err("Bad file number".to_string())
         }
     }
@@ -146,13 +169,16 @@ fn main() {
                    "integrate" => {
                        if let Some(ref va_out) = va_output {
 
+                           let file_selected = va_out.nth_file(cmd_parts[1].parse::<usize>().unwrap()).expect("Bad file number");
                            let integrated_payload = integrate(va_out
-                                                ,cmd_parts[1].parse::<usize>().unwrap()
+                                                , file_selected
                                                 , cmd_parts[2].parse::<usize>().unwrap()
                                                 , payload_from_str(cmd_parts[3])
                            ).unwrap();
                            comp_res = Some(
-                               compile_mock_integration(integrated_payload)
+                               compile_mock_integration(&integrated_payload
+                               , va_out.nth_file_crate(cmd_parts[1].parse::<usize>().unwrap()).expect("Bad file number")
+                               , &file_selected.name)
                             );
                        } else {
                            error!("You must run vanalyze command before");
