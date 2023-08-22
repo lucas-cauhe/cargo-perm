@@ -1,4 +1,18 @@
 #!/bin/bash
+# Output format
+#
+# <n> : <crate_name> <file_path_from_src_crate>
+#       <k> <method_name> <line_no>
+#
+# Where <n> is the file number from the selected files
+# <crate_name> is the crate's name preceded by the archive src (github or index)
+# <file_path_from_src_crate> is the path to the vulnerable file from the root
+# of the crate
+# <k> is the method number from the vulnerable file
+# <method_name> is the method name so that the attacker can identify whether it
+# is being used in the target code base
+# <line_no> is the line number of where the method <method_name> is defined in
+# the target file
 
 read_cargo_file () {
   list_deps=""
@@ -69,6 +83,7 @@ done <<< "$matching_crates"
 
 echo $vulnerable_crate_files | tr '&' '\n' | tr ' ' '\n'
 # find crate methods used in cargo project
+
 # for now it will only print all vulnerable files
 
 

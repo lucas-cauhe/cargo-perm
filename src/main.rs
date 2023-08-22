@@ -35,14 +35,13 @@ use std::io::Write;
 fn vanalyze(path: &Path, username: &str) -> Vaoutput {}
 
 // Returns a rust program to be compiled afterwards
-// Injects a payload into the <method_no>'th method in the <file_no>'th file specified in
-// <va_input>
-fn integrate(va_input: &Vaoutput, file_selected: &FileOutput, method_no: usize, payload: &dyn Payload) -> PayloadResult<String> {
-
-   let method_starting_line = file_selected.nth_method_sl(method_no)?;
+// Injects in the <file_selected> file at line <method_starting_line> the code for running
+// <payload>
+// <file_selected> has to be the absolute path to the file
+fn integrate(file_selected: &String, method_starting_line: usize, payload: &dyn Payload) -> PayloadResult<String> {
    payload.inject(
-       &std::fs::read_to_string(file_selected.name).unwrap() 
-       , method_starting_line
+       &std::fs::read_to_string(file_selected.clone()).unwrap() 
+       , &method_starting_line
    )
 }
 // returns error if compilation was not successful
@@ -170,19 +169,51 @@ fn main() {
                        if let Some(ref va_out) = va_output {
 
                            let file_selected = va_out.nth_file(cmd_parts[1].parse::<usize>().unwrap()).expect("Bad file number");
-                           let integrated_payload = integrate(va_out
-                                                , file_selected
-                                                , cmd_parts[2].parse::<usize>().unwrap()
+                           let method_sl = file_selected.nth_method_sl(
+                        cmd_parts[2].parse::<usize>().unwrap()
+                               ).expect("Bad method number");
+                           let integrated_payload = integrate(
+                                                &file_selected.name
+                                                , method_sl.clone() 
                                                 , payload_from_str(cmd_parts[3])
                            ).unwrap();
+                           // /home/username/.cargo/registry/src/*/crate_name/...
+                           // crate's path ends at the 8th forslash
+                           let (target_crate, mut target_file) = cmd_parts[1].match_indices('/').nth(7).map(|(index, _)| cmd_parts[1].split_at(index)).unwrap();
+                           target_file = &target_file.replacen('/', "", 1);
                            comp_res = Some(
                                compile_mock_integration(&integrated_payload
-                               , va_out.nth_file_crate(cmd_parts[1].parse::<usize>().unwrap()).expect("Bad file number")
-                               , &file_selected.name)
+                               , target_crate
+                               , target_file)
                             );
                        } else {
                            error!("You must run vanalyze command before");
                        }
+                   },
+                   "exploit" => { 
+                       
+                        // get method starting line
+                        // read file until you hit with the method
+                        let reader = std::fs::read_to_string(&cmd_parts[1].to_string()).unwrap().lines();
+                        let maybe_line =  reader.enumerate().filter(|(line_no, line)| line.contains(" fn ") && line.contains(cmd_parts[2]) /* may not be exhaustive but dah */).collect::<Vec<(usize, &str)>>(); 
+
+                        if maybe_line.len() > 0 {
+                            let method_line = maybe_line[0].0;
+                            let integrated_payload = integrate(
+                                      &cmd_parts[1].to_string() 
+                                      , method_line 
+                                      , payload_from_str(cmd_parts[3])
+                              );
+                           let target_file
+                           comp_res = Some(
+                               compile_mock_integration(&integrated_payload.expect("error injecting payload")
+                               , 
+                               , cmd_parts[1])
+                            );
+                        } else {
+                            error!("Method not found in specified file")
+                        }
+                        
                    },
                    "ok" => {
                        if let Some(compiled) = comp_res {
