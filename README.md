@@ -123,6 +123,10 @@ Searches accross the local cargo archive and a target cargo project to find all 
 
 ### Usage
 
+```
+./vanalyzer/run.sh <target-project-path> <target-username>
+```
+
 ## Available payloads
 
 All payload types (reverse shell mainly and other malware) that can be placed inside a target crate source code. All available payloads as of now are:

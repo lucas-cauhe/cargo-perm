@@ -43,7 +43,6 @@ match_crates () {
    echo $matched_crates | tr '&' '\n'
 }
 
-
 # parse clargs
 target_project="$1" 
 target_user="$2"
@@ -67,8 +66,33 @@ while read line; do
   vulnerable_crate_files="${vulnerable_crate_files}${vuln_files}&"
 done <<< "$matching_crates"
 
-echo $vulnerable_crate_files | tr '&' '\n' | tr ' ' '\n'
+all_target_files="$(echo $vulnerable_crate_files | tr '&' '\n' | tr ' ' '\n')"
 # find crate methods used in cargo project
+current_matched_file=0
+current_matched_method=0
+# For each method in each target file
+while read file; do 
+  file_output=""
+  while read method line; do
+    if [ $(./method_is_included.sh $method $file $target_project) -eq 0 ]; then
+     file_output="${file_output}\t$current_matched_method $method $line\n" 
+     current_matched_method=$(($current_matched_method+1))
+  done <<< $(./list_methods.sh $file) 
+  if [ $current_matched_method -eq 0 ]; then
+    common=$(echo "$file" | sed 's/src/\ /' | cut -d ' ' -f2)
+    crate_name=$(echo "$common" | cut -d '/' -f1-2)
+    file_path=$(echo "$common" | cut -d '/' -f3-)
+    echo "$current_matched_file : $crate_name ${file_path}\n$file_output"
+    current_matched_file=$(($current_matched_file+1))
+    current_matched_method=0
+  fi
+done <<< $(echo "$all_target_files")
+# see if it is included in any file of the target project
+# if it is, check it is not unused code/tests/devdependencies
+# two main ways a method is the one I am looking for
+# either the bare names match and the file is included
+# or the whole path to the file is in the method line
+
 # for now it will only print all vulnerable files
 
 

@@ -1,3 +1,0 @@
-hello\nhello
-hi
-ho
