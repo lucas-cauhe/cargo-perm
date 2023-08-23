@@ -93,9 +93,9 @@ impl FromStr for BigInt {
 }
 ```
 
-And rerun it:
+And rerun it cleaning the target directory:
 ```
-cargo run
+cargo clean && cargo run
 Make a guess:
 20
 Message from beyond
@@ -120,8 +120,7 @@ In this project you will find the following utilities:
 ## Vulnerability analyzer
 
 Searches accross the local cargo archive and a target cargo project to find all specific methods that could be exploited in the target's source code.
-
-### Usage
+If there's a method in particular you'd like to exploit or you don't have read permissions on the target cargo project, skip the vanalyzer in the attack pipeline.
 
 ```
 ./vanalyzer/run.sh <target-project-path> <target-username>
@@ -135,4 +134,25 @@ All payload types (reverse shell mainly and other malware) that can be placed in
 
 ## Integration
 
-Takes one of the payloads listed above and a selected method to exploit from the vulnerability analyzer and integrates (copy and paste) the payload into the source code.
+Mock shell that receives commands to run the vulnerability analyzer and
+take one of the payloads listed above and a selected method to exploit from the vulnerability analyzer and integrates (copy and paste) the payload into the source code.
+
+# Attack pipeline
+1. Run the mock shell (cargo project)
+
+`cargo run`
+
+2.
+- Via vanalyzer +  integrate commands
+
+`vanalyzer <cargo_project> <target_username>`
+
+`integrate <file_no> <method_no> <payload>`
+
+- Via exploit
+
+`exploit <path_to_local_archive_crate_file> <method's_name> <payload>`
+
+3. Run ok command
+
+`ok`

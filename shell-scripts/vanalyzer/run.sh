@@ -1,4 +1,18 @@
 #!/bin/bash
+# Output format
+#
+# <n> : <crate_name> <file_path_from_src_crate>
+#       <k> <method_name> <line_no>
+#
+# Where <n> is the file number from the selected files
+# <crate_name> is the crate's path in the local archive 
+# <file_path_from_src_crate> is the path to the vulnerable file from the root
+# of the crate
+# <k> is the method number from the vulnerable file
+# <method_name> is the method name so that the attacker can identify whether it
+# is being used in the target code base
+# <line_no> is the line number of where the method <method_name> is defined in
+# the target file
 
 read_cargo_file () {
   list_deps=""
@@ -46,6 +60,8 @@ match_crates () {
 # parse clargs
 target_project="$1" 
 target_user="$2"
+# Check target project is readable for current user
+[ ! -r "$target_project" ] && echo "target project is not readable" && exit 1
 # list deps in target cargo project inside Cargo.toml file
 [ ! -f "${target_project}/Cargo.toml"  ] && echo "Target project specified is not a cargo project or Cargo.toml
 file was not found" && exit 1
@@ -68,6 +84,7 @@ done <<< "$matching_crates"
 
 all_target_files="$(echo $vulnerable_crate_files | tr '&' '\n' | tr ' ' '\n')"
 # find crate methods used in cargo project
+<<<<<<< HEAD:vanalyzer/run.sh
 current_matched_file=0
 current_matched_method=0
 # For each method in each target file
@@ -92,6 +109,8 @@ done <<< $(echo "$all_target_files")
 # two main ways a method is the one I am looking for
 # either the bare names match and the file is included
 # or the whole path to the file is in the method line
+=======
+>>>>>>> c7283778532c308d59c0a72d097248bf9b7a6d26:shell-scripts/vanalyzer/run.sh
 
 # for now it will only print all vulnerable files
 
