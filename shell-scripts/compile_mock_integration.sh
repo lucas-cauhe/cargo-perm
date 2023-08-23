@@ -1,8 +1,8 @@
 #!/bin/bash
-# Program usage: compile_mock_integration.sh <crate_local_name> <src_program_path>
+# Program usage: compile_mock_integration.sh <crate_local_path> <src_program_path>
 # <mock_program_name>
 
-# Where crate_local_name is the name of the target crate in the local archive
+# Where crate_local_path is the path to the target crate in the local archive
 # src_program_path is the path to the target file where to inject the payload
 # from the crate directory
 # mock_program_name is the path to the mock program resulting from the

@@ -5,7 +5,7 @@
 #       <k> <method_name> <line_no>
 #
 # Where <n> is the file number from the selected files
-# <crate_name> is the crate's name preceded by the archive src (github or index)
+# <crate_name> is the crate's path in the local archive 
 # <file_path_from_src_crate> is the path to the vulnerable file from the root
 # of the crate
 # <k> is the method number from the vulnerable file
@@ -61,6 +61,8 @@ match_crates () {
 # parse clargs
 target_project="$1" 
 target_user="$2"
+# Check target project is readable for current user
+[ ! -r "$target_project" ] && echo "target project is not readable" && exit 1
 # list deps in target cargo project inside Cargo.toml file
 [ ! -f "${target_project}/Cargo.toml"  ] && echo "Target project specified is not a cargo project or Cargo.toml
 file was not found" && exit 1
