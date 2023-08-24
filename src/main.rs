@@ -28,11 +28,13 @@
 // 3. run integrate command
 // 4. run ok command
 
+#[macro_use]
+extern crate log;
+
 mod vanalyzer;
 mod payload;
 mod compilation;
 
-use log::{error, info}; 
 use std::path::Path;
 use std::io::Write;
 
@@ -67,6 +69,7 @@ fn ok_command(comp_stat: &CompilationStatus) -> Result<(), String> {
 }
 
 fn main() {
+    env_logger::init();
     // launch reader thread with socket fd
     let (tx, rx) = std::sync::mpsc::channel::<String>();
     std::thread::spawn(move || {
@@ -74,7 +77,7 @@ fn main() {
             let stdin = std::io::stdin();
             let mut buf: String = "".to_string(); 
             match stdin.read_line(&mut buf) {
-                Ok(_) => tx.send(buf).unwrap(),
+                Ok(_) => {info!("sent message"); tx.send(buf).unwrap()},
                 Err(_) => /* This should cause a dead end error */ { drop(tx); break;}
             }
         }
@@ -84,8 +87,9 @@ fn main() {
     loop {
        match rx.try_recv().ok() {
            Some(cmd) => {
+               println!("Received command {cmd}");
                let cmd_parts: Vec<&str> = cmd.split(' ').collect();
-               match cmd_parts[0] {
+               match cmd_parts[0].trim() {
                    "vanalyze" => {
                        info!("Running vanalyzer command");
                        match vanalyze(Path::new(&cmd_parts[1]), &cmd_parts[2]) {
@@ -159,4 +163,8 @@ fn main() {
            None => ()
        }
     }
+}
+
+#[cfg(test)]
+mod tests {
 }

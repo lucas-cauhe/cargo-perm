@@ -84,17 +84,18 @@ done <<< "$matching_crates"
 
 all_target_files="$(echo $vulnerable_crate_files | tr '&' '\n' | tr ' ' '\n')"
 # find crate methods used in cargo project
-<<<<<<< HEAD:vanalyzer/run.sh
 current_matched_file=0
 current_matched_method=0
 # For each method in each target file
 while read file; do 
   file_output=""
   while read method line; do
+    # see if it is included in any file of the target project
     if [ $(./method_is_included.sh $method $file $target_project) -eq 0 ]; then
+      # if it is, check it is not unused code/tests/devdependencies (TODO)
      file_output="${file_output}\t$current_matched_method $method $line\n" 
      current_matched_method=$(($current_matched_method+1))
-  done <<< $(./list_methods.sh $file) 
+  done <<< "$(./list_methods.sh $file)" 
   if [ $current_matched_method -eq 0 ]; then
     common=$(echo "$file" | sed 's/src/\ /' | cut -d ' ' -f2)
     crate_name=$(echo "$common" | cut -d '/' -f1-2)
@@ -104,13 +105,6 @@ while read file; do
     current_matched_method=0
   fi
 done <<< $(echo "$all_target_files")
-# see if it is included in any file of the target project
-# if it is, check it is not unused code/tests/devdependencies
-# two main ways a method is the one I am looking for
-# either the bare names match and the file is included
-# or the whole path to the file is in the method line
-=======
->>>>>>> c7283778532c308d59c0a72d097248bf9b7a6d26:shell-scripts/vanalyzer/run.sh
 
 # for now it will only print all vulnerable files
 

@@ -21,12 +21,15 @@
 
 # list all files from the target_project and get those matching the pattern
 
+# There are times when the file name is not the same as the module showing the
+# method
+# for instance, when there's a mod.rs file.
 uses_method () {
   # Pattern 1: use .*<file>::<method> + <method>(.*)
   # Pattern 2: .*<file>::<method>(.*)
   # Pattern 3: ::<file> + .<method>(.*)
   grep "use\ *.*$file::\{?[\w_,\ ]*$method[\w_,\ ]*\}?.*$" "$1" && grep "$method\(" "$1"  && echo 1 && exit 0 # Pattern 1 matches 
-  grep && echo 1 && exit 0 # Pattern 2 mathces
+  grep   && echo 1 && exit 0 # Pattern 2 mathces
 }
 
 method="$1"

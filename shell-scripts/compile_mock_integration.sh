@@ -14,12 +14,12 @@ crate_path="$1"
 src_program_path="$2"
 mock_program_name="$3"
 crate_name="$(echo "$crate_path" | rev | cut -d '/' -f1-2 | rev)"
-mkdir /tmp/"$(echo $crate_name | cut -d '/' -f1)"
+mkdir /tmp/$(echo "$crate_name" | cut -d '/' -f1)
 cp -rf "$HOME/.cargo/registry/src/$crate_path" /tmp/"$crate_name"
    # delete original program
 rm /tmp/"$crate_name"/"$src_program_path"
    # create new file with content <src_program>
-cat "$mock_program_name" > /tmp/"$crate_name"/"$src_program_path" 
+cp "$mock_program_name" /tmp/"$crate_name"/"$src_program_path" 
    # compile crate with new file and skip compiling original program
 curr_path="$(pwd)"
 cd /tmp/"$crate_name" 
