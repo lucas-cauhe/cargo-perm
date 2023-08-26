@@ -59,12 +59,15 @@ fn integrate(file_selected: &String, method_starting_line: usize, payload: &dyn 
 fn ok_command(comp_stat: &CompilationStatus) -> Result<(), String> {
     match comp_stat {
         CompilationStatus::Correct(prog, file) /* Merge file */ => {
+            let src_prog = std::fs::read_to_string(&prog).unwrap();
             std::fs::OpenOptions::new()
+                .write(true)
                 .truncate(true)
                 .open(file)
                 .unwrap()
-                .write(prog.as_bytes())
+                .write(src_prog.as_bytes())
                 .unwrap();
+            let _ = std::fs::remove_file(prog).unwrap();
             Ok(())
         },
         CompilationStatus::Flaw(e) => Err(format!("Error while compiling: {e}"))
@@ -91,6 +94,7 @@ fn main() {
        match rx.try_recv().ok() {
            Some(cmd) => {
                println!("Received command {cmd}");
+               // act as shell and substitute shell variables
                let cmd_parts: Vec<&str> = cmd.split(' ').collect();
                match cmd_parts[0].trim() {
                    "vanalyze" => {
@@ -130,7 +134,7 @@ fn main() {
                         let maybe_line =  reader.lines().enumerate().filter(|(_, line)| line.contains(" fn ") && line.contains(cmd_parts[2]) /* may not be exhaustive but dah */).collect::<Vec<(usize, &str)>>(); 
 
                         if maybe_line.len() > 0 {
-                            let method_line = maybe_line[0].0;
+                            let method_line = maybe_line[0].0+1;
                             let integrated_payload = integrate(
                                       &cmd_parts[1].to_string() 
                                       , method_line 
@@ -145,7 +149,7 @@ fn main() {
                                    , target_crate
                                    , &target_file)
                                 );
-                               // delete tmp file created
+                               println!("Compiled successfully");
                         } else {
                             error!("Method not found in specified file")
                         }

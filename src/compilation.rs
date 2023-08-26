@@ -15,8 +15,9 @@ pub fn compile_mock_integration(src_program: &str, target_crate: &str, target_fi
   // convert output to CompilationStatus
   info!("Command stdout: {:?}", String::from_utf8(output.stdout.clone()).unwrap());
   info!("Command stderr: {:?}", String::from_utf8(output.stderr.clone()).unwrap());
+  let target_file_path = target_crate.to_string()+"/"+&target_file;
   if output.stdout.len() > 0 {
-      CompilationStatus::Correct(src_program.to_string(), target_file.to_string())
+      CompilationStatus::Correct(src_program.to_string(), target_file_path)
   }
   else {
       CompilationStatus::Flaw(String::from_utf8(output.stderr).unwrap())
