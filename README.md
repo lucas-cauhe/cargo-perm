@@ -137,6 +137,10 @@ All payload types (reverse shell mainly and other malware) that can be placed in
 Mock shell that receives commands to run the vulnerability analyzer and
 take one of the payloads listed above and a selected method to exploit from the vulnerability analyzer and integrates (copy and paste) the payload into the source code.
 
+# Requirements
+
+- [cargo-public-api](https://crates.io/crates/cargo-public-api)
+
 # Attack pipeline
 1. Run the mock shell (cargo project)
 

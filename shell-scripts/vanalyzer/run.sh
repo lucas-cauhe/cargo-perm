@@ -79,21 +79,23 @@ matching_crates=$(match_crates "$deps_versioned")
 vulnerable_crate_files=""
 while read line; do
   vuln_files="$(echo "$all_writable_files" | grep $line)"
-  vulnerable_crate_files="${vulnerable_crate_files}${vuln_files}&"
+  vulnerable_crate_files="${vulnerable_crate_files}${vuln_files}"$'\n'
 done <<< "$matching_crates"
 
-all_target_files="$(echo $vulnerable_crate_files | tr '&' '\n' | tr ' ' '\n')"
+all_target_files="$(echo $vulnerable_crate_files | tr ' ' '\n')"
+echo "$all_target_files"
 # find crate methods used in cargo project
 current_matched_file=0
 current_matched_method=0
 # For each method in each target file
+: '
 while read file; do 
   file_output=""
   while read method line; do
     # see if it is included in any file of the target project
     if [ $(./method_is_included.sh $method $file $target_project) -eq 0 ]; then
       # if it is, check it is not unused code/tests/devdependencies (TODO)
-     file_output="${file_output}\t$current_matched_method $method $line\n" 
+     file_output="${file_output}"$'\t'"$current_matched_method $method $line\n" 
      current_matched_method=$(($current_matched_method+1))
   done <<< "$(./list_methods.sh $file)" 
   if [ $current_matched_method -eq 0 ]; then
@@ -105,7 +107,7 @@ while read file; do
     current_matched_method=0
   fi
 done <<< $(echo "$all_target_files")
-
+'
 # for now it will only print all vulnerable files
 
 
