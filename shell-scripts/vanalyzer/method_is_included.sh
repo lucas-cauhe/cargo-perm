@@ -9,14 +9,6 @@
 # If it is not exposed or not used in <target_project> then it should echo 1,
 # otherwise 0
 # cargo-public-api crate will take care of that
-# It can be either included with use statement so that <file> must appear in
-# the file in target_project as well as method
-# or the whole path to the method is used
-# in any case, both <file> and <method> must appear in any file in
-# <target_project>, hence searching for the path to the file first and the name
-# of the method next should be enough??, nope since the file could be included
-# but not the method and there could be another method with the same name
-# so search by use statement and whole path
 
 # the search must be semantic-scope-based
 # since use statements can be used in specific scopes
@@ -34,21 +26,25 @@
 # as the given one and the path to it from the src of the docs is the same path
 # that exposes the method in the API
 find_method () {
-  pub_api="$(cargo public-api --manifest-path "$crate_path/Cargo.toml" | grep "pub fn " | grep "::$method(" )"
-  cargo doc --no-deps --manifest-path "$crate_path/Cargo.toml" &>/dev/null
+  api_file="/tmp/${crate_name_version}-public-api"
+  pub_api="$(grep "::$method(" "$api_file")"
   found_method=""
   while read result; do
    # Take the exposing path of the method previous to it
    prev_path=$(echo "$result" | grep -o "\(\w*::\)*$method(" | sed "s/::$method(//g")
-   exposing_item=$(echo "$prev_path" | sed 's/::/\ /g' | rev | cut -d ' ' -f1 | rev)
+   exposing_item=$(echo "$prev_path" | sed 's/::/\ /g' | rev | cut -d ' ' -f1 | rev | sed 's/<.*>//g')
    # Find the html file where the struct/trait/enum is documented
-   html_half_path="${crate_path}target/doc/""$(echo "$prev_path" | sed 's/::/\//g' | rev | cut -d '/' -f2- | rev)"
-   file_doc=$(ls $html_half_path | grep "\.$exposing_item\.")
-   html_path="$html_half_path/$file_doc"
-   # Scrap the html file found, to hit the method's name
-   grep -oE "<a class=\"srclink rightside\" href=\"../src/${crate_name}${file_in_crate}\.html#[0-9]*-[0-9]*\">source</a><a href=\"#method.$method\" class=\"anchor\">" "$html_path" &>/dev/null
+   if [[ "$exposing_item" =~ [a-zA-Z][a-zA-Z]+ ]]; then
+     html_half_path="${crate_path}target/doc/""$(echo "$prev_path" | sed 's/::/\//g' | rev | cut -d '/' -f2- | rev)"
+     if [ -d $html_half_path ]; then
+       file_doc=$(ls $html_half_path | grep "\.$exposing_item\.")
+       html_path="$html_half_path/$file_doc"
+       # Scrap the html file found, to hit the method's name
+       grep -oE "<a class=\"srclink rightside\" href=\"../src/${crate_name}${file_in_crate}.html#[0-9]*-[0-9]*\">source</a><a href=\"#method.$method\" class=\"anchor\">" "$html_path" 
 
-   [ $? -eq 0 ] && found_method="$(echo $result | grep -o "\(\w*::\)*$method(" | sed 's/(//g' )"
+       [ $? -eq 0 ] && found_method="$(echo $result | grep -o "\(\w*::\)*$method(" | sed 's/(//g' )"
+     fi
+   fi
   done <<< $(echo "$pub_api")
   echo "$found_method" 
 }
@@ -69,19 +65,17 @@ uses_method () {
 # parse cl args
 export method="$1"
 file_in_crate=$(echo "$2" | sed 's/src/ /g' | rev | cut -d ' ' -f1 | rev)
-# This is wrong, if there is a folder of depth 3 doesn't work
 crate_path=$(echo "$2" | grep -oE "^.*/[a-zA-Z-]*[0-9\.]+/")
-crate_name=$(echo "$2" | grep -oE "/[a-zA-Z-]*[0-9\.]+/" | cut -d '-' -f1-2 | tr '-' '_' | sed 's/\///g')
+crate_name_version=$(echo "$2" | grep -oE "/[a-zA-Z-]*[0-9\.]+/" | tr '-' '_' | sed 's/\///g')
+crate_name=$(echo "$2" | grep -oE "/[a-zA-Z-]*[0-9\.]+/" | grep -oE "[a-zA-Z-]*[a-zA-Z]" | tr '-' '_' )
 target_project="$3"
 
 # Check cargo-public-api is installed
-[ ! -f "$HOME/.cargo/bin/cargo-public-api" ] && echo "You must install cargo-public-api subcommand, please read the requirements" && exit 1
+[ ! -f "$HOME/.cargo/bin/cargo-public-api" ] && echo "You must install cargo-public-api subcommand, please read the requirements" >&2 && echo 2 && exit 1
 # More than one method with the same name may appear in public API
 export method_exposure=$(find_method)
-[ "$method_exposure" == "" ] && echo "method has not been found in crate's public API" && exit 1
+[ "$method_exposure" == "" ] && echo 1 && exit 1
 
 method_is_used=$(find "$target_project" -type f -print | grep "\.rs$" | xargs -I% bash -c "$(declare -f uses_method) ; uses_method %" ) 
 [ "$method_is_used" == "" ] && echo 1 && exit
-echo 0
-# rest of scopes are left for future versions
-
+echo 0 && exit
