@@ -100,6 +100,11 @@ while read line; do
   cargo doc -q --no-deps --manifest-path "${crate_path}/Cargo.toml" 
 done <<< "$matching_crates"
 
+# Generate invalid lines files
+while read file; do
+  file_name=$(echo $file | tr '/' '_')
+  ./invalid_lines.sh $file > "/tmp/$file_name-inv_lines"
+done <<< "$(find "$target_project" -type f -print | grep "\.rs$")"
 
 all_target_files="$(echo $vulnerable_crate_files | tr ' ' '\n')"
 # find crate methods used in cargo project

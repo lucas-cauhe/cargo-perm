@@ -49,18 +49,25 @@ find_method () {
   echo "$found_method" 
 }
 
+is_valid () {
+   line=$(echo "$1" | cut -d ' ' -f1)
+   cat $2 | grep -w -q $line
+}
+
 uses_method () {
   # Pattern 1: use .*<mod>::<method> + <method>(.*)
   # Pattern 2: .*<mod>::<method>(.*)
   # Pattern 3: ::<mod> + .<method>(.*) 
   # Pattern 3 and every other possible combination can be reduced to the first two.
   # Once matched, make sure the line is not commented (line or block)
+  file_name=$(echo $1 | tr '/' '_')
+  inv_file="/tmp/$file_name-inv_lines"
   mod=$(echo "$method_exposure" | sed 's/::/:/g' | rev | cut -d ':' -f2 | rev)
-  grep "use\ *$method_exposure\ *\$" "$1" &>/dev/null && grep "$method(" "$1" &>/dev/null && echo 0 && exit # Pattern 1 matches 
+  cat -n "$1" | echo "$(grep "use\ *$method_exposure\ *\$")" $inv_file | is_valid && grep "$method(" "$1" &>/dev/null && echo 0 && exit # Pattern 1 matches
 
-  grep "^.*$mod::$method(.*).*\$" "$1" &>/dev/null && echo 0 && exit # Pattern 2 mathces
+  cat -n "$1" | echo "$(grep "^.*$mod::$method(.*).*\$")" $inv_file | is_valid && echo 0 && exit # Pattern 2 matches
   
-  grep "^use.*::$mod" "$1" &>/dev/null && grep "\.$method(" "$1" &>/dev/null && echo 0 && exit 
+  cat -n "$1" | echo "$(grep "^use.*::$mod")" $inv_file | is_valid && grep "\.$method(" "$1" &>/dev/null && echo 0 && exit # Pattern 3 matches 
   }
 # parse cl args
 export method="$1"
@@ -68,7 +75,7 @@ file_in_crate=$(echo "$2" | sed 's/src/ /g' | rev | cut -d ' ' -f1 | rev)
 crate_path=$(echo "$2" | grep -oE "^.*/[a-zA-Z-]*[0-9\.]+/")
 crate_name_version=$(echo "$2" | grep -oE "/[a-zA-Z-]*[0-9\.]+/" | tr '-' '_' | sed 's/\///g')
 crate_name=$(echo "$2" | grep -oE "/[a-zA-Z-]*[0-9\.]+/" | grep -oE "[a-zA-Z-]*[a-zA-Z]" | tr '-' '_' )
-target_project="$3"
+export target_project="$3"
 
 # Check cargo-public-api is installed
 [ ! -f "$HOME/.cargo/bin/cargo-public-api" ] && echo "You must install cargo-public-api subcommand, please read the requirements" >&2 && echo 2 && exit 1
