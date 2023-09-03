@@ -111,13 +111,12 @@ while read file; do
   current_matched_method=0
   while read method line; do
     # see if it is included in any file of the target project
-    included_result=$(./method_is_included.sh "$method" "$file" "$target_project")
+    included_result=$(./method_is_included.sh "$method" "$file" "$target_project" 2>/dev/null)
     if [ $included_result -eq 2 ]; then
       echo "Fatal error occurred, solve it and restart" >&2
       exit 1
     elif [ $included_result -eq 0 ]; then
-      # if it is, check it is not unused code/tests/devdependencies (TODO)
-      echo "found matching method: $method" >&2
+      # if it is, check it is not unused code/tests/devdependencies/commentary (TODO)
      file_output="${file_output}"$'\t'"$current_matched_method $method $line"$'\n' 
      current_matched_method=$(($current_matched_method+1))
     fi
@@ -131,4 +130,3 @@ while read file; do
 done <<< $(echo "$all_target_files")
 rm /tmp/*-public-api
 echo "$final_output" >&2
-

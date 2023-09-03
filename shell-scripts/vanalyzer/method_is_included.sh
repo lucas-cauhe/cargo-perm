@@ -53,14 +53,14 @@ uses_method () {
   # Pattern 1: use .*<mod>::<method> + <method>(.*)
   # Pattern 2: .*<mod>::<method>(.*)
   # Pattern 3: ::<mod> + .<method>(.*) 
-  # Pattern 3 and every other possible combination can be reduced to the first
-  # two.
+  # Pattern 3 and every other possible combination can be reduced to the first two.
+  # Once matched, make sure the line is not commented (line or block)
   mod=$(echo "$method_exposure" | sed 's/::/:/g' | rev | cut -d ':' -f2 | rev)
-  grep "use\ *$method_exposure\ *$" "$1" &>/dev/null && grep "$method\(" "$1" &>/dev/null && echo 0 && exit # Pattern 1 matches 
+  grep "use\ *$method_exposure\ *\$" "$1" &>/dev/null && grep "$method(" "$1" &>/dev/null && echo 0 && exit # Pattern 1 matches 
 
-  grep "^.*$mod::$method\(.*\).*$" "$1" &>/dev/null && echo 0 && exit # Pattern 2 mathces
+  grep "^.*$mod::$method(.*).*\$" "$1" &>/dev/null && echo 0 && exit # Pattern 2 mathces
   
-  grep "^use.*::$mod" "$1" &>/dev/null && grep "\.$method\(" "$1" &>/dev/null && echo 0 && exit 
+  grep "^use.*::$mod" "$1" &>/dev/null && grep "\.$method(" "$1" &>/dev/null && echo 0 && exit 
   }
 # parse cl args
 export method="$1"
@@ -77,5 +77,6 @@ export method_exposure=$(find_method)
 [ "$method_exposure" == "" ] && echo 1 && exit 1
 
 method_is_used=$(find "$target_project" -type f -print | grep "\.rs$" | xargs -I% bash -c "$(declare -f uses_method) ; uses_method %" ) 
+
 [ "$method_is_used" == "" ] && echo 1 && exit
 echo 0 && exit
