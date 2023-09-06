@@ -116,7 +116,7 @@ while read file; do
   current_matched_method=0
   while read method line; do
     # see if it is included in any file of the target project
-    included_result=$(./method_is_included.sh "$method" "$file" "$target_project" 2>/dev/null)
+    included_result=$(./method_is_included.sh "$method" "$file" "$target_project" )
     if [ $included_result -eq 2 ]; then
       echo "Fatal error occurred, solve it and restart" >&2
       exit 1
@@ -134,4 +134,5 @@ while read file; do
   fi
 done <<< $(echo "$all_target_files")
 rm /tmp/*-public-api
+rm /tmp/*-inv_lines
 echo "$final_output" >&2

@@ -37,12 +37,14 @@ find_method () {
    if [[ "$exposing_item" =~ [a-zA-Z][a-zA-Z]+ ]]; then
      html_half_path="${crate_path}target/doc/""$(echo "$prev_path" | sed 's/::/\//g' | rev | cut -d '/' -f2- | rev)"
      if [ -d $html_half_path ]; then
-       file_doc=$(ls $html_half_path | grep "\.$exposing_item\.")
-       html_path="$html_half_path/$file_doc"
-       # Scrap the html file found, to hit the method's name
-       grep -oE "<a class=\"srclink rightside\" href=\"../src/${crate_name}${file_in_crate}.html#[0-9]*-[0-9]*\">source</a><a href=\"#method.$method\" class=\"anchor\">" "$html_path" 
+       file_doc="$(ls $html_half_path | grep "\.$exposing_item\.")"
+       if [ "$file_doc" != "" ]; then
+         html_path="$html_half_path/$file_doc"
+         # Scrap the html file found, to hit the method's name
+         grep -oqE "<a class=\"srclink rightside\" href=\"../src/${crate_name}${file_in_crate}.html#[0-9]*-[0-9]*\">source</a><a href=\"#method.$method\" class=\"anchor\">" "$html_path" 
 
-       [ $? -eq 0 ] && found_method="$(echo $result | grep -o "\(\w*::\)*$method(" | sed 's/(//g' )"
+         [ $? -eq 0 ] && found_method="$(echo $result | grep -o "\(\w*::\)*$method(" | sed 's/(//g' )"
+       fi
      fi
    fi
   done <<< $(echo "$pub_api")
@@ -50,8 +52,11 @@ find_method () {
 }
 
 is_valid () {
-   line=$(echo "$1" | cut -d ' ' -f1)
-   cat $2 | grep -w -q $line
+   lines=$(echo "$1" | cut -d ' ' -f1)
+   while read line; do
+     grep -w -q "$line" "$2" || return 0
+   done <<< "$lines"
+   return 1
 }
 
 uses_method () {
@@ -63,11 +68,11 @@ uses_method () {
   file_name=$(echo $1 | tr '/' '_')
   inv_file="/tmp/$file_name-inv_lines"
   mod=$(echo "$method_exposure" | sed 's/::/:/g' | rev | cut -d ':' -f2 | rev)
-  cat -n "$1" | echo "$(grep "use\ *$method_exposure\ *\$")" $inv_file | is_valid && grep "$method(" "$1" &>/dev/null && echo 0 && exit # Pattern 1 matches
+  grep -q "use\ *$method_exposure\ *$" "$1" && grep -q "$method(" "$1" && is_valid "$(cat -n "$1" | awk '$1=$1' | grep "$method(")" "$inv_file" && echo 0 && exit # Pattern 1 matches
 
-  cat -n "$1" | echo "$(grep "^.*$mod::$method(.*).*\$")" $inv_file | is_valid && echo 0 && exit # Pattern 2 matches
+  grep -q "^.*$mod::$method(.*).*$" "$1" && is_valid "$(cat -n "$1" | awk '$1=$1' | grep ".*$mod::$method(.*).*$")" "$inv_file" && echo 0 && exit # Pattern 2 matches
   
-  cat -n "$1" | echo "$(grep "^use.*::$mod")" $inv_file | is_valid && grep "\.$method(" "$1" &>/dev/null && echo 0 && exit # Pattern 3 matches 
+  grep -q "^use.*::$mod" "$1" && grep "\.$method(" "$1" && is_valid "$(cat -n "$1" | awk '$1=$1' | grep "\.$method(")" "$inv_file" && echo 0 && exit # Pattern 3 matches 
   }
 # parse cl args
 export method="$1"
@@ -75,15 +80,15 @@ file_in_crate=$(echo "$2" | sed 's/src/ /g' | rev | cut -d ' ' -f1 | rev)
 crate_path=$(echo "$2" | grep -oE "^.*/[a-zA-Z-]*[0-9\.]+/")
 crate_name_version=$(echo "$2" | grep -oE "/[a-zA-Z-]*[0-9\.]+/" | tr '-' '_' | sed 's/\///g')
 crate_name=$(echo "$2" | grep -oE "/[a-zA-Z-]*[0-9\.]+/" | grep -oE "[a-zA-Z-]*[a-zA-Z]" | tr '-' '_' )
-export target_project="$3"
+target_project="$3"
 
 # Check cargo-public-api is installed
 [ ! -f "$HOME/.cargo/bin/cargo-public-api" ] && echo "You must install cargo-public-api subcommand, please read the requirements" >&2 && echo 2 && exit 1
 # More than one method with the same name may appear in public API
-export method_exposure=$(find_method)
+export method_exposure="$(find_method)"
 [ "$method_exposure" == "" ] && echo 1 && exit 1
 
-method_is_used=$(find "$target_project" -type f -print | grep "\.rs$" | xargs -I% bash -c "$(declare -f uses_method) ; uses_method %" ) 
+method_is_used=$(find "$target_project" -type f -print | grep "\.rs$" | xargs -I% bash -c "$(declare -f uses_method) ; $(declare -f is_valid) ; uses_method %" ) 
 
 [ "$method_is_used" == "" ] && echo 1 && exit
 echo 0 && exit
